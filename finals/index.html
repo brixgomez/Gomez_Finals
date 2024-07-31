@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather App</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            width: 80%;
+            margin: auto;
+            padding: 20px;
+        }
+        #map {
+            height: 400px;
+            width: 100%;
+            margin-top: 20px;
+        }
+        form {
+            margin-bottom: 20px;
+        }
+        .forecast-container, .hourly-container {
+            display: flex;
+            flex-direction: column;
+        }
+        .forecast-day, .forecast-hour {
+            margin-bottom: 10px;
+        }
+        h2 {
+            color: #333;
+        }
+        img {
+            vertical-align: middle;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <form id="cityForm">
+            <input type="text" id="cityInput" placeholder="Enter city name" required>
+            <button type="submit">Get Weather</button>
+        </form>
+        <div id="weather">Your current weather will be displayed here.</div>
+        <div id="forecast">5-day forecast will be displayed here.</div>
+        <div id="hourly">12-hour forecast will be displayed here.</div>
+        <div id="map">The map will be displayed here.</div>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const geoapifyKey = "9f3b89c0c0f341869bd97440ec48d5db"; // Replace with your Geoapify API key
+            const openWeatherMapKey = "a344694bb8a02490e0040196c93c8607"; // Replace with your OpenWeatherMap API key
+            const form = document.getElementById("cityForm");
+            const weatherDiv = document.getElementById("weather");
+            const forecastDiv = document.getElementById("forecast");
+            const hourlyDiv = document.getElementById("hourly");
+            const mapDiv = document.getElementById("map");
+
+            form.addEventListener("submit", function(event) {
+                event.preventDefault();
+                const city = document.getElementById("cityInput").value;
+                getLocation(city);
+            });
+
+            function getLocation(city) {
+                const geoapifyUrl = `https://api.geoapify.com/v1/geocode/search?text=${city}&apiKey=${geoapifyKey}`;
+
+                fetch(geoapifyUrl)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data && data.features && data.features.length > 0) {
+                            const { lat, lon } = data.features[0].properties;
+                            fetchWeatherData(lat, lon);
+                            fetchDailyWeather(lat, lon); // Fetch daily weather
+                            fetchHourlyWeather(lat, lon); // Fetch hourly weather
+                            showMap(lat, lon); // Show the map
+                        } else {
+                            weatherDiv.innerHTML = "<p>City not found.</p>";
+                            forecastDiv.innerHTML = "";
+                            hourlyDiv.innerHTML = "";
+                            mapDiv.innerHTML = ""; // Clear the map if city is not found
+                        }
+                    })
+                    .catch(error => {
+                        console.error("Error fetching location data:", error);
+                        weatherDiv.innerHTML = "<p>Error fetching location data.</p>";
+                        forecastDiv.innerHTML = "";
+                        hourlyDiv.innerHTML = "";
+                        mapDiv.innerHTML = ""; // Clear the map on error
+                    });
+            }
+
+            function fetchWeatherData(lat, lon) {
+                const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${openWeatherMapKey}&units=metric`;
+
+                fetch(url)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data) {
+                            displayWeather(data);
+                        } else {
+                            weatherDiv.innerHTML = "<p>No current weather data available.</p>";
+                        }
+                    })
+                    .catch(error => {
+                        console.error("Error fetching weather data:", error);
+                        weatherDiv.innerHTML = "<p>Error fetching weather data.</p>";
+                    });
+            }
+
+            function fetchDailyWeather(lat, lon) {
+                const url = `https://api.openweathermap.org/data/2.5/onecall?lat=${lat}&lon=${lon}&exclude=hourly,minutely&appid=${openWeatherMapKey}&units=metric`;
+
+                fetch(url)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data && data.daily) {
+                            displayDailyWeather(data.daily);
+                        } else {
+                            forecastDiv.innerHTML = "<p>No daily weather data available.</p>";
+                        }
+                    })
+                    .catch(error => {
+                        console.error("Error fetching daily weather data:", error);
+                        forecastDiv.innerHTML = "<p>Error fetching daily weather data.</p>";
+                    });
+            }
+
+            function fetchHourlyWeather(lat, lon) {
+                const url = `https://api.openweathermap.org/data/2.5/onecall?lat=${lat}&lon=${lon}&exclude=current,minutely,daily&appid=${openWeatherMapKey}&units=metric`;
+
+                fetch(url)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data && data.hourly) {
+                            displayHourlyWeather(data.hourly);
+                        } else {
+                            hourlyDiv.innerHTML = "<p>No hourly weather data available.</p>";
+                        }
+                    })
+                    .catch(error => {
+                        console.error("Error fetching hourly weather data:", error);
+                        hourlyDiv.innerHTML = "<p>Error fetching hourly weather data.</p>";
+                    });
+            }
+
+            function displayWeather(data) {
+                const temperature = data.main.temp;
+                const weather = data.weather[0].description;
+                const icon = data.weather[0].icon;
+                const iconUrl = `https://openweathermap.org/img/wn/${icon}.png`;
+                const weatherContent = `
+                    <h2>Current Weather</h2>
+                    <img src="${iconUrl}" alt="${weather}">
+                    <p>Temperature: ${temperature}°C</p>
+                    <p>Weather: ${weather}</p>
+                `;
+                weatherDiv.innerHTML = weatherContent;
+            }
+
+            function displayDailyWeather(dailyForecasts) {
+                const dailyContent = dailyForecasts.slice(1, 6).map(day => { // Skip the first day, which is current
+                    const date = new Date(day.dt * 1000).toLocaleDateString();
+                    const minTemp = day.temp.min;
+                    const maxTemp = day.temp.max;
+                    const weather = day.weather[0].description;
+                    const icon = day.weather[0].icon;
+                    const iconUrl = `https://openweathermap.org/img/wn/${icon}.png`;
+                    return `
+                        <div class="forecast-day">
+                            <h3>${date}</h3>
+                            <img src="${iconUrl}" alt="${weather}">
+                            <p>Min Temperature: ${minTemp}°C</p>
+                            <p>Max Temperature: ${maxTemp}°C</p>
+                            <p>Weather: ${weather}</p>
+                        </div>
+                    `;
+                }).join('');
+
+                forecastDiv.innerHTML = `<h2>5-Day Forecast</h2><div class="forecast-container">${dailyContent}</div>`;
+            }
+
+            function displayHourlyWeather(hourlyForecasts) {
+                const hourlyContent = hourlyForecasts.slice(0, 12).map(hour => { // Limit to 12 hours
+                    const time = new Date(hour.dt * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    const temp = hour.temp;
+                    const weather = hour.weather[0].description;
+                    const icon = hour.weather[0].icon;
+                    const iconUrl = `https://openweathermap.org/img/wn/${icon}.png`;
+                    return `
+                        <div class="forecast-hour">
+                            <h3>${time}</h3>
+                            <img src="${iconUrl}" alt="${weather}">
+                            <p>Temperature: ${temp}°C</p>
+                            <p>Weather: ${weather}</p>
+                        </div>
+                    `;
+                }).join('');
+
+                hourlyDiv.innerHTML = `<h2>12-Hour Forecast</h2><div class="hourly-container">${hourlyContent}</div>`;
+            }
+
+            function showMap(lat, lon) {
+                // Create a map using Geoapify Maps API
+                const mapUrl = `https://maps.geoapify.com/v1/map?lat=${lat}&lon=${lon}&zoom=12&style=osm-bright&apiKey=${geoapifyKey}`;
+                mapDiv.innerHTML = `<iframe src="${mapUrl}" width="100%" height="400" frameborder="0" style="border:0;" allowfullscreen></iframe>`;
+            }
+        });
+    </script>
+</body>
+</html>

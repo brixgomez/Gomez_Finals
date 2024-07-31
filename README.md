@@ -1,5 +1,6 @@
 # Gomez_Finals
 upon using this website first
-  1.The user will add a start and end point
-  2.It will Auto matically show the Suggested route
+(make sure your  api key for open weather is working)
+  1.The user will type the city
+  2.It will Auto matically show the weather and the map(the map is failed to show)
 Gomez_Finals
